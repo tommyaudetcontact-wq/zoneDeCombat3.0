@@ -1,0 +1,579 @@
+// ==========================================
+// CONFIGURATION GLOBALE ET CACHE EN MÉMOIRE
+// ==========================================
+const SPREADSHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
+let memoizedSpreadsheet = null;
+
+function getActiveSpreadsheet() {
+  if (!memoizedSpreadsheet) {
+    memoizedSpreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  }
+  return memoizedSpreadsheet;
+}
+
+function getSheet(sheetName) {
+  return getActiveSpreadsheet().getSheetByName(sheetName);
+}
+
+// Transforme une feuille en tableau d'objets (Utilise la première ligne comme clés)
+function sheetToObjects(sheet) {
+  if (!sheet) return [];
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return [];
+  const headers = data[0];
+  const rows = data.slice(1);
+  return rows.map(row => {
+    const obj = {};
+    headers.forEach((header, i) => { obj[header] = row[i]; });
+    return obj;
+  });
+}
+
+// ==========================================
+// ROUTAGE PRINCIPAL AVEC INTEGRATION CORS SECURISEE
+// ==========================================
+function doGet(e) {
+  let result = {};
+  
+  // Si 'e' ou 'e.parameter' est absent, on gère proprement
+  if (!e || !e.parameter) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Aucun paramètre fourni." }))
+          .setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  const action = e.parameter.action;
+  
+  try {
+    if (action === 'login') {
+      result = login(e.parameter.username, e.parameter.password);
+    } else if (action === 'getState') {
+      result = getJoueurState(e.parameter.username);
+    } else if (action === 'getMembres') {
+      result = getTousLesMembres();
+    } else if (action === 'getTaches') {
+      result = getTaches(e.parameter.username, e.parameter.role);
+    } else if (action === 'changerStatut') {
+      result = changerStatutTache(e.parameter.id, e.parameter.statut);
+    } else if (action === 'ajouterTache') {
+      result = ajouterTache(e.parameter.desc, parseInt(e.parameter.xp), parseFloat(e.parameter.money), e.parameter.assign);
+    } else if (action === 'creerMembre') {
+      result = creerMembre(e.parameter.nom);
+    } else if (action === 'supprimerMembre') {
+      result = supprimerMembre(e.parameter.nom);
+    } else if (action === 'getCollection') {
+      result = getCollection();
+    } else if (action === 'getEchanges') {
+      result = getEchanges(e.parameter.username);
+    } else if (action === 'creerEchange') {
+      result = creerEchange(e.parameter.demandeur, e.parameter.receveur, e.parameter.maCarteId, e.parameter.saCarteId);
+    } else if (action === 'repondreEchange') {
+      result = repondreEchange(e.parameter.id, e.parameter.statut);
+    } else if (action === 'enregistrerCarteLocal') {
+      result = enregistrerCartePiocheeLocalement(e.parameter.idMembre, e.parameter.username, e.parameter.cardId, e.parameter.cardName, e.parameter.cardImg);
+    } 
+    // ROUTES DUELS PvP
+    else if (action === 'setPresenceCombat') {
+      result = setPresenceCombat(e.parameter.username, e.parameter.status);
+    } else if (action === 'getMembresActifs') {
+      result = getMembresActifs(e.parameter.username);
+    } else if (action === 'creerMatch') {
+      result = creerMatch(e.parameter.j1, e.parameter.j2);
+    } else if (action === 'rechercherDefis') {
+      result = rechercherDefis(e.parameter.username);
+    } else if (action === 'repondreDefi') {
+      result = repondreDefi(e.parameter.id, e.parameter.statut, e.parameter.deck, e.parameter.role);
+    } else if (action === 'jouerActionMulti') {
+      result = jouerActionMulti(e.parameter.id, e.parameter.username, e.parameter.type, parseInt(e.parameter.dmg), e.parameter.element);
+    } else if (action === 'nettoyerMatchFin') {
+      result = nettoyerMatchFin(e.parameter.id);
+    } else {
+      result = { success: false, error: "Action non reconnue: " + action };
+    }
+  } catch(err) {
+    // Si une fonction plante, on intercepte et on force le renvoi en JSON compatible CORS
+    result = { success: false, error: err.toString(), message: "Erreur d'exécution Apps Script interne" };
+  }
+  
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ==========================================
+// GESTION DES JOUERS & GLOBAL STATE
+// ==========================================
+function login(username, password) {
+  if (username && username.toLowerCase() === 'admin' && password === '1234') {
+    return { success: true, role: 'admin', user: 'Admin' };
+  }
+  const members = sheetToObjects(getSheet('Membres'));
+  const user = members.find(m => m.Nom && username && m.Nom.toLowerCase() === username.toLowerCase() && m.Role !== 'admin');
+  if (user) {
+    return { success: true, role: 'joueur', user: user.Nom, id: user.ID_Membre };
+  }
+  return { success: false, message: 'Utilisateur introuvable' };
+}
+
+function getTousLesMembres() {
+  const members = sheetToObjects(getSheet('Membres'));
+  return members.filter(m => m.Nom).map(m => m.Nom);
+}
+
+function getJoueurState(username) {
+  const members = sheetToObjects(getSheet('Membres'));
+  const user = members.find(m => m.Nom && username && m.Nom.toLowerCase() === username.toLowerCase());
+  if (user) {
+    return { idMembre: user.ID_Membre, xp: user.XP, niveau: user.Niveau, argent: user.Argent, stateUpdate: user.State_Update };
+  }
+  return null;
+}
+
+function incrementState(username) {
+  const sheet = getSheet('Membres');
+  if(!sheet) return;
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][1] && username && (data[i][1].toLowerCase() === username.toLowerCase() || username === 'Tous' || username === 'Admin')) {
+      const currentUpdate = parseInt(data[i][6]) || 0;
+      sheet.getRange(i + 1, 7).setValue(currentUpdate + 1);
+    }
+  }
+}
+
+// ==========================================
+// SYSTEME DE MISSIONS / TÂCHES
+// ==========================================
+function getTaches(username, role) {
+  const taches = sheetToObjects(getSheet('Taches'));
+  if (role === 'admin') return taches;
+  return taches.filter(t => t.Assigne_A && username && (t.Assigne_A.toLowerCase() === username.toLowerCase() || t.Assigne_A === 'Tous'));
+}
+
+function ajouterTache(description, xp, argent, assigneA) {
+  const sheet = getSheet('Taches');
+  const id = 'T_' + new Date().getTime();
+  sheet.appendRow([id, description, xp, argent, assigneA, 'a faire']);
+  incrementState(assigneA);
+  incrementState('Admin');
+  return { success: true };
+}
+
+function changerStatutTache(idTache, nouveauStatut) {
+  const sheet = getSheet('Taches');
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === idTache) {
+      if (nouveauStatut === 'approuve') {
+        const assigneA = data[i][4];
+        attribuerRecompenses(assigneA, parseInt(data[i][2]), parseFloat(data[i][3]));
+        sheet.deleteRow(i + 1);
+      } else {
+        sheet.getRange(i + 1, 6).setValue(nouveauStatut);
+        incrementState('Admin');
+        incrementState(data[i][4]);
+      }
+      break;
+    }
+  }
+  return { success: true };
+}
+
+function attribuerRecompenses(username, xpGagne, argentGagne) {
+  const sheet = getSheet('Membres');
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][1] && username && (data[i][1].toLowerCase() === username.toLowerCase() || (username === 'Tous' && data[i][2] !== 'admin'))) {
+      let currentXp = parseInt(data[i][3]) || 0;
+      let currentNiveau = parseInt(data[i][4]) || 1;
+      let currentArgent = parseFloat(data[i][5]) || 0;
+      
+      currentXp += xpGagne;
+      currentArgent += argentGagne;
+      
+      while (currentXp >= 100) {
+        currentXp -= 100;
+        currentNiveau += 1; 
+      }
+      
+      sheet.getRange(i + 1, 4).setValue(currentXp);
+      sheet.getRange(i + 1, 5).setValue(currentNiveau);
+      sheet.getRange(i + 1, 6).setValue(currentArgent);
+      
+      const currentUpdate = parseInt(data[i][6]) || 0;
+      sheet.getRange(i + 1, 7).setValue(currentUpdate + 1);
+    }
+  }
+}
+
+// ==========================================
+// LOGIQUE DE COLLECTION & ÉCHANGES
+// ==========================================
+function enregistrerCartePiocheeLocalement(idMembre, nomJoueur, cardId, cardName, cardImg) {
+  const collectionSheet = getSheet('Collection');
+  collectionSheet.appendRow([idMembre, nomJoueur, cardId, cardName, new Date(), cardImg]);
+  incrementState(nomJoueur);
+  return { success: true };
+}
+
+function getCollection() {
+  return sheetToObjects(getSheet('Collection')) || [];
+}
+
+function getEchanges(username) {
+  const echanges = sheetToObjects(getSheet('Echanges'));
+  if (!username) return [];
+  return echanges.filter(e => e.Demandeur && e.Receveur && (e.Demandeur.toLowerCase() === username.toLowerCase() || e.Receveur.toLowerCase() === username.toLowerCase()));
+}
+
+function creerEchange(demandeur, receveur, maCarteId, saCarteId) {
+  const sheet = getSheet('Echanges');
+  const id = 'EX_' + new Date().getTime();
+  sheet.appendRow([id, demandeur, receveur, maCarteId, saCarteId, 'en_attente']);
+  incrementState(receveur);
+  incrementState(demandeur);
+  return { success: true };
+}
+
+function repondreEchange(id, statut) {
+  const sheet = getSheet('Echanges');
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === id) {
+      const demandeur = data[i][1];
+      const receveur = data[i][2];
+      const maCarteId = data[i][3];
+      const saCarteId = data[i][4];
+      
+      if (statut === 'accepte') {
+        executerTransactionDouble(demandeur, receveur, maCarteId, saCarteId);
+      }
+      
+      sheet.deleteRow(i + 1);
+      
+      incrementState(demandeur);
+      incrementState(receveur);
+      break;
+    }
+  }
+  return { success: true };
+}
+
+function executerTransactionDouble(demandeur, receveur, maCarteId, saCarteId) {
+  const collectionSheet = getSheet('Collection');
+  const data = collectionSheet.getDataRange().getValues();
+  
+  let donneurOk = false;
+  let receveurOk = false;
+
+  for (let i = 1; i < data.length; i++) {
+    let rowUser = data[i][1] ? data[i][1].toString().toLowerCase() : "";
+    let rowCard = data[i][2] ? data[i][2].toString() : "";
+
+    if (!donneurOk && demandeur && rowUser === demandeur.toLowerCase() && rowCard === maCarteId.toString()) {
+      collectionSheet.getRange(i + 1, 2).setValue(receveur);
+      donneurOk = true;
+    }
+    else if (!receveurOk && receveur && rowUser === receveur.toLowerCase() && rowCard === saCarteId.toString()) {
+      collectionSheet.getRange(i + 1, 2).setValue(demandeur);
+      receveurOk = true;
+    }
+    
+    if(donneurOk && receveurOk) break;
+  }
+}
+
+function creerMembre(nom) {
+  const sheet = getSheet('Membres');
+  const data = sheet.getDataRange().getValues();
+  sheet.appendRow([data.length, nom, 'joueur', 0, 1, 0, 0]);
+  incrementState('Admin');
+  return { success: true };
+}
+
+function supprimerMembre(nom) {
+  const sheet = getSheet('Membres');
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][1] && nom && data[i][1].toString().toLowerCase() === nom.toLowerCase()) {
+      sheet.deleteRow(i + 1);
+      break;
+    }
+  }
+  incrementState('Admin');
+  return { success: true };
+}
+
+// ==========================================
+//        MOTEUR EXCLUSIF AU COMBAT PvP
+// ==========================================
+function setPresenceCombat(username, status) {
+  const sheet = getSheet('Membres');
+  const data = sheet.getDataRange().getValues();
+  let misAJour = false;
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][1] && username && data[i][1].toString().toLowerCase() === username.toLowerCase()) {
+      sheet.getRange(i + 1, 8).setValue(status.toUpperCase()); // Colonne H: En_Combat
+      misAJour = true;
+      break;
+    }
+  }
+
+  if (misAJour) {
+    if (status.toUpperCase() === 'NON') {
+      const combatSheet = getSheet('Combats');
+      const combatData = combatSheet.getDataRange().getValues();
+      for (let j = 1; j < combatData.length; j++) {
+        let j1 = combatData[j][1] ? combatData[j][1].toString().toLowerCase() : "";
+        let j2 = combatData[j][2] ? combatData[j][2].toString().toLowerCase() : "";
+        if (username && (j1 === username.toLowerCase() || j2 === username.toLowerCase()) && combatData[j][3] !== 'termine') {
+          combatSheet.getRange(j + 1, 4).setValue('termine');
+        }
+      }
+    }
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][1]) {
+        sheet.getRange(i + 1, 7).setValue((parseInt(data[i][6]) || 0) + 1);
+      }
+    }
+  }
+  return { success: true };
+}
+
+function getMembresActifs(username) {
+  const sheet = getSheet('Membres');
+  const data = sheet.getDataRange().getValues();
+  const actifs = [];
+  for (let i = 1; i < data.length; i++) {
+    let nom = data[i][1] ? data[i][1].toString().trim() : "";
+    let enCombat = data[i][7] ? data[i][7].toString().trim().toUpperCase() : "";
+    if (nom && nom !== 'Admin' && username && nom.toLowerCase() !== username.toLowerCase() && enCombat === 'OUI') {
+      actifs.push(nom);
+    }
+  }
+  return actifs;
+}
+
+function creerMatch(j1, j2) {
+  const sheet = getSheet('Combats');
+  const id = 'BTL_' + new Date().getTime();
+  sheet.appendRow([id, j1, j2, 'en_attente', '', '', 0, 0, 25, 25, 'Invitation envoyée', j1]);
+  incrementState(j2);
+  incrementState(j1);
+  return { success: true, idCombat: id };
+}
+
+function rechercherDefis(username) {
+  const sheet = getSheet('Combats');
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1 || !username) return { found: false };
+
+  const userLower = username.toLowerCase();
+
+  for (let i = data.length - 1; i >= 1; i--) {
+    let j1 = data[i][1] ? data[i][1].toString().trim() : "";
+    let j2 = data[i][2] ? data[i][2].toString().trim() : "";
+    let statut = data[i][3] ? data[i][3].toString().trim() : "";
+
+    if ((j1.toLowerCase() === userLower || j2.toLowerCase() === userLower) && statut !== 'termine') {
+      return {
+        found: true,
+        combat: {
+          ID_Combat: data[i][0].toString(),
+          Joueur_1: j1,
+          Joueur_2: j2,
+          Statut: statut,
+          Deck_J1: data[i][4] ? data[i][4].toString() : "",
+          Deck_J2: data[i][5] ? data[i][5].toString() : "",
+          Index_J1: data[i][6],
+          Index_J2: data[i][7],
+          HP_J1: data[i][8],
+          HP_J2: data[i][9],
+          Dernier_Coup: data[i][10] ? data[i][10].toString() : "",
+          Tour_A: data[i][11] ? data[i][11].toString() : ""
+        }
+      };
+    }
+  }
+  return { found: false };
+}
+
+function repondreDefi(idCombat, statut, deck, role) {
+  const sheet = getSheet('Combats');
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0].toString() === idCombat.toString()) {
+      const j1 = data[i][1];
+      const j2 = data[i][2];
+      
+      if (statut === 'accepte') {
+        sheet.getRange(i + 1, 4).setValue('configuration'); 
+      } else if (statut === 'pret') {
+        if (role === 'J1') {
+          sheet.getRange(i + 1, 5).setValue(deck); 
+        } else if (role === 'J2') {
+          sheet.getRange(i + 1, 6).setValue(deck); 
+        }
+        
+        SpreadsheetApp.flush(); 
+        const valDeckJ1 = sheet.getRange(i + 1, 5).getValue().toString().trim();
+        const valDeckJ2 = sheet.getRange(i + 1, 6).getValue().toString().trim();
+        
+        if (valDeckJ1 !== "" && valDeckJ2 !== "") {
+          sheet.getRange(i + 1, 4).setValue('actif'); 
+          sheet.getRange(i + 1, 11).setValue('Le combat commence !');
+          sheet.getRange(i + 1, 12).setValue(j1); 
+        }
+      } else {
+        sheet.getRange(i + 1, 4).setValue(statut); 
+      }
+      
+      incrementState(j1);
+      incrementState(j2);
+      break;
+    }
+  }
+  return { success: true };
+}
+
+function jouerActionMulti(idCombat, username, type, dmg, element) {
+  const sheet = getSheet('Combats');
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0].toString() === idCombat.toString()) {
+      let j1 = data[i][1];
+      let j2 = data[i][2];
+      
+      let indexJ1 = parseInt(sheet.getRange(i + 1, 7).getValue()) || 0;
+      let indexJ2 = parseInt(sheet.getRange(i + 1, 8).getValue()) || 0;
+      let hpJ1 = parseInt(sheet.getRange(i + 1, 9).getValue()) || 25;
+      let hpJ2 = parseInt(sheet.getRange(i + 1, 10).getValue()) || 25;
+      let dernierCoupPrecedent = sheet.getRange(i + 1, 11).getValue().toString();
+      
+      let logs = "";
+      
+      if (type === 'attaque') {
+        let esquiveActive = dernierCoupPrecedent.includes("Esquive RÉUSSIE et CONTRE-ATTAQUE prête !");
+        
+        if (esquiveActive) {
+          logs = username + " attaque... mais l'adversaire esquive et RETOURNE l'attaque [" + element + "] ! " + username + " subit " + dmg + " dégâts !";
+          if (username && username.toLowerCase() === j1.toLowerCase()) {
+            hpJ1 -= dmg;
+            if (hpJ1 <= 0) { hpJ1 = 25; indexJ1 += 1; logs = "Le contre a mis KO un Pokémon de " + username + " !"; }
+          } else {
+            hpJ2 -= dmg;
+            if (hpJ2 <= 0) { hpJ2 = 25; indexJ2 += 1; logs = "Le contre a mis KO un Pokémon de " + username + " !"; }
+          }
+        } else {
+          logs = username + " lance une attaque de type [" + element + "] et inflige " + dmg + " dégâts !";
+          if (username && username.toLowerCase() === j1.toLowerCase()) {
+            hpJ2 -= dmg;
+            if (hpJ2 <= 0) { hpJ2 = 25; indexJ2 += 1; logs = username + " a mis KO un Pokémon !"; }
+          } else {
+            hpJ1 -= dmg;
+            if (hpJ1 <= 0) { hpJ1 = 25; indexJ1 += 1; logs = username + " a mis KO un Pokémon !"; }
+          }
+        }
+      } 
+      else if (type === 'esquive') {
+        let reussite = Math.random() < 0.33;
+        if (reussite) {
+          logs = username + " prépare une parade... Esquive RÉUSSIE et CONTRE-ATTAQUE prête !";
+        } else {
+          logs = username + " tente une esquive... mais ÉCHOUE !";
+        }
+      }
+      
+      let prochainTour = (username && username.toLowerCase() === j1.toLowerCase()) ? j2 : j1;
+      let statutActuel = (indexJ1 >= 3 || indexJ2 >= 3) ? 'termine' : 'actif';
+
+      sheet.getRange(i + 1, 4).setValue(statutActuel);
+      sheet.getRange(i + 1, 7).setValue(indexJ1);
+      sheet.getRange(i + 1, 8).setValue(indexJ2);
+      sheet.getRange(i + 1, 9).setValue(hpJ1);
+      sheet.getRange(i + 1, 10).setValue(hpJ2);
+      sheet.getRange(i + 1, 11).setValue(logs);
+      sheet.getRange(i + 1, 12).setValue(prochainTour);
+      
+      if (statutActuel === 'termine') {
+        let vainqueur = (indexJ2 >= 3) ? j1 : j2;
+        let resultatGain = attribuerXpFinCombat(vainqueur, 20);
+        
+        nettoyerPresenceApresCombat(j1);
+        nettoyerPresenceApresCombat(j2);
+        
+        sheet.getRange(i + 1, 4).setValue('afficher_modal'); 
+        
+        let logFinal = "FIN_MATCH:" + vainqueur + "|" + (resultatGain.levelUp ? "LEVEL_UP:" + resultatGain.nouvelleCarte : "RAS");
+        sheet.getRange(i + 1, 11).setValue(logFinal);
+      }
+      
+      incrementState(j1);
+      incrementState(j2);
+      break;
+    }
+  }
+  return { success: true };
+}
+
+function attribuerXpFinCombat(username, xpGagne) {
+  const sheet = getSheet('Membres');
+  const data = sheet.getDataRange().getValues();
+  let response = { levelUp: false, nouvelleCarte: "" };
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][1] && username && data[i][1].toString().toLowerCase() === username.toLowerCase()) {
+      let idMembre = data[i][0];
+      let currentXp = parseInt(data[i][3]) || 0;
+      let currentNiveau = parseInt(data[i][4]) || 1;
+      
+      currentXp += xpGagne;
+      
+      if (currentXp >= 100) {
+        currentXp -= 100;
+        currentNiveau += 1;
+        response.levelUp = true;
+        
+        let randomNum = Math.floor(Math.random() * 260) + 1;
+        let pId = "swsh8-" + randomNum;
+        let pNom = "CADEAU NIVEAU #" + randomNum;
+        let pImg = "https://images.pokemontcg.io/swsh8/" + randomNum + "_hires.png";
+        
+        const collSheet = getSheet('Collection');
+        collSheet.appendRow([idMembre, username, pId, pNom, new Date(), pImg]);
+        response.nouvelleCarte = pId;
+      }
+      
+      sheet.getRange(i + 1, 4).setValue(currentXp); 
+      sheet.getRange(i + 1, 5).setValue(currentNiveau); 
+      break;
+    }
+  }
+  return response;
+}
+
+function nettoyerPresenceApresCombat(username) {
+  const sheet = getSheet('Membres');
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][1] && username && data[i][1].toString().toLowerCase() === username.toLowerCase()) {
+      sheet.getRange(i + 1, 8).setValue(""); 
+      break;
+    }
+  }
+}
+
+function nettoyerMatchFin(idCombat) {
+  const sheet = getSheet('Combats');
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0].toString() === idCombat.toString()) {
+      sheet.getRange(i + 1, 4).setValue('termine');
+      incrementState(data[i][1]);
+      incrementState(data[i][2]);
+      break;
+    }
+  }
+  return { success: true };
+}

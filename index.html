@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Zone de Combat PvP - Récompenses & Effets</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root { 
+            --brawl-yellow: #FFF200; --brawl-blue: #00A6FF; --brawl-orange: #FF5500; 
+            --brawl-green: #10D010; --brawl-pink: #FF007F;
+            --feu-color: #FF4500; --eau-color: #00BFFF; --eclair-color: #FFD700; --feuille-color: #32CD32;
+            
+            --neon-green: #00FFCC;
+            --neon-pink: #FF007F;
+        }
+        
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body { 
+            font-family: 'Montserrat', sans-serif; 
+            background: radial-gradient(circle, #20003b 0%, #090014 100%); 
+            color: #fff; 
+            min-height: 100vh; 
+            overflow-x: hidden;
+            user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .brawl-font { 
+            font-family: 'Luckiest Guy', cursive; 
+            -webkit-text-stroke: 2px #000; 
+            text-shadow: 4px 4px 0px #000; 
+        }
+        
+        .login-container { 
+            max-width: 450px; 
+            margin: 5vh auto; 
+            background: rgba(0, 0, 0, 0.6); 
+            border: 6px solid #000; 
+            border-radius: 25px; 
+        }
+        
+        .brawl-btn { 
+            font-family: 'Luckiest Guy', cursive; 
+            font-size: 1.2rem; 
+            color: white !important; 
+            text-shadow: 2px 2px 0px #000; 
+            border: 4px solid #000; 
+            border-radius: 15px; 
+            box-shadow: 0px 6px 0px #000; 
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+        
+        .brawl-btn:active:not(:disabled) {
+            transform: translateY(4px);
+            box-shadow: 0px 2px 0px #000;
+        }
+        
+        /* Correction : Suppression de l'effet de persistance (focus) du navigateur */
+        .brawl-btn:focus, .brawl-btn:focus-visible {
+            outline: none !important;
+            box-shadow: 0px 6px 0px #000 !important;
+        }
+        .brawl-btn:active:focus {
+            box-shadow: 0px 2px 0px #000 !important;
+        }
+        
+        .brawl-btn:disabled { 
+            opacity: 0.5; 
+            box-shadow: none; 
+            transform: none; 
+        }
+        
+        .btn-yellow { background-color: var(--brawl-yellow); color: #000 !important; text-shadow: none; }
+        .btn-blue { background-color: var(--brawl-blue); } 
+        .btn-orange { background-color: var(--brawl-orange); } 
+        .btn-green { background-color: var(--brawl-green); } 
+        .btn-pink { background-color: var(--brawl-pink); }
+        
+        .brawl-card { 
+            background: #240046; 
+            border: 4px solid #000; 
+            border-radius: 20px; 
+            box-shadow: 0px 8px 0px #000; 
+        }
+        
+        /* --- ARÈNE DE COMBAT (MOBILE STABLE 100VH) --- */
+        #battlePhase {
+            height: 100vh;
+            max-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            padding: 8px;
+            position: relative;
+            margin: 0;
+        }
+
+        /* Distribution de l'espace & padding généreux pour les arènes */
+        .zone-adversaire {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 0, 0, 0.08);
+            border: 3px solid rgba(255, 50, 50, 0.4);
+            border-radius: 16px;
+            margin-bottom: 4px;
+            padding: 12px 6px;
+            position: relative;
+        }
+
+        .zone-moi {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 255, 0, 0.08);
+            border: 3px solid rgba(50, 255, 50, 0.4);
+            border-radius: 16px;
+            margin-bottom: 6px;
+            padding: 12px 6px;
+            position: relative;
+        }
+
+        .zone-actions-bas {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            padding-bottom: env(safe-area-inset-bottom, 4px);
+        }
+
+        .zone-actions-bas .brawl-btn {
+            flex: 1;
+            font-size: 1.3rem;
+            padding: 10px 0;
+            border-radius: 14px;
+        }
+
+        /* --- CORRECTION MAJEURE : RATIO CARD PARFAIT --- */
+        /* Utilisation du ratio standard 5/7 des cartes de collection pour coller parfaitement à l'image */
+        .pokemon-card-wrapper { 
+            background: transparent; 
+            padding: 0; 
+            border: 4px solid var(--neon-green); 
+            border-radius: 12px; 
+            width: 100%;
+            aspect-ratio: 5 / 7;
+            cursor: pointer; 
+            display: inline-block;
+            box-shadow: 0 0 12px var(--neon-green); 
+            transition: all 0.3s ease; 
+            position: relative; 
+            overflow: hidden; 
+        }
+        
+        /* En combat : On limite par la hauteur et on laisse l'aspect-ratio dicter la largeur exacte */
+        #battlePhase .pokemon-card-wrapper {
+            flex: 1;
+            min-height: 0;
+            height: 100%;
+            max-height: 140px; 
+            width: auto;
+            margin: 8px 0;
+        }
+
+        .pokemon-card-wrapper.selected { 
+            border-color: var(--brawl-yellow) !important; 
+            box-shadow: 0 0 18px var(--brawl-yellow); 
+            transform: scale(1.05);
+        }
+        
+        /* L'image remplit parfaitement la div à 100% sans marge ni déformation */
+        .pokemon-card-img { 
+            height: 100%; 
+            width: 100%; 
+            object-fit: fill; 
+            border-radius: 8px; 
+            display: block; 
+            transition: all 0.5s ease; 
+        }
+        
+        .hp-bar-container { background: #222; border: 3px solid #000; border-radius: 10px; height: 20px; width: 75%; position: relative; overflow: hidden; }
+        .hp-bar-fill { background: linear-gradient(to right, #ff0055, #10d010); height: 100%; width: 100%; transition: width 0.4s ease; }
+        .hp-text { position: absolute; width: 100%; text-align: center; top: 0; left: 0; font-family: 'Luckiest Guy', cursive; font-size: 0.8rem; text-shadow: 1px 1px 0 #000; color: #fff; }
+        
+        .log-box { 
+            background: rgba(0,0,0,0.6); 
+            border: 2px solid #000; 
+            border-radius: 8px; 
+            padding: 2px 6px; 
+            font-size: 0.85rem; 
+            font-weight: bold; 
+            width: 100%;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 2px;
+        }
+        
+        .mini-card { width: 30px; height: 42px; object-fit: contain; border-radius: 4px; border: 2px solid #000; margin: 1px; display: inline-block; }
+        .mini-card.ko-mini { filter: grayscale(1) brightness(0.2); opacity: 0.3; }
+        .mini-card.active-mini { border-color: var(--brawl-yellow); transform: scale(1.1); box-shadow: 0 0 6px var(--brawl-yellow); }
+
+        .fx-projectile { position: fixed; font-size: 3.8rem; z-index: 9999; pointer-events: none; transition: all 0.7s cubic-bezier(0.25, 1, 0.5, 1); }
+        .fx-particle { position: fixed; width: 8px; height: 8px; border-radius: 50%; z-index: 10000; pointer-events: none; opacity: 1; }
+        
+        @keyframes shake { 0%, 100% { transform: translate(0, 0); } 20%, 60% { transform: translate(-8px, 4px); } 40%, 80% { transform: translate(8px, -4px); } }
+        .shake-card { animation: shake 0.4s ease-in-out; }
+
+        .shatter-card { animation: shatterAnim 0.8s ease-in-out forwards; filter: contrast(1.5) brightness(0.5) sepia(1) hue-rotate(-50deg); }
+        @keyframes shatterAnim {
+            0% { transform: scale(1) rotate(0deg); opacity: 1; }
+            30% { transform: scale(1.05) rotate(2deg); filter: blur(0.5px); }
+            100% { transform: scale(0) rotate(-15deg); opacity: 0; }
+        }
+        
+        .glass-crack::after {
+            content: "⚡"; position: absolute; top:0; left:0; width:100%; height:100%;
+            font-size: 4rem; display:flex; align-items:center; justify-content:center;
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: contrast(2) blur(1px); z-index: 10;
+        }
+
+        /* --- NOTIFICATION DE TOUR BRAWL STARS --- */
+        .brawl-banner-container {
+            position: fixed; top: 40%; left: 0; width: 100%; pointer-events: none; z-index: 99999; display: none;
+        }
+        .brawl-banner-text {
+            font-family: 'Luckiest Guy', cursive; font-size: 2.5rem; text-align: center;
+            text-shadow: 4px 4px 0px #000; -webkit-text-stroke: 2px #000; white-space: nowrap;
+            display: inline-block; width: 100%;
+            animation: brawlFlyTrack 1.6s cubic-bezier(0.18, 0.89, 0.32, 1.15) forwards;
+        }
+        .banner-moi { color: var(--brawl-yellow); }
+        .banner-adversaire { color: #FF3333; }
+
+        @keyframes brawlFlyTrack {
+            0% { transform: translateX(100%) scale(0.7); opacity: 0; }
+            25% { transform: translateX(0%) scale(1.1); opacity: 1; }
+            55% { transform: translateX(0%) scale(1); opacity: 1; }
+            70% { transform: translateX(-4%) scale(1); opacity: 1; }
+            100% { transform: translateX(-150%) scale(0.8); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- INTERFACE APPLICATIVE GENERALE (HORS ARENE) -->
+    <div id="nonBattleInterface" class="container py-3">
+        <!-- HEADER GENERAL -->
+        <div id="headerBar" class="d-flex justify-content-between align-items-center mb-3 d-none">
+            <div><h2 class="brawl-font text-warning mb-0" id="displayUsername">JOUEUR</h2></div>
+            <a href="https://tommyaudetcontact-wq.github.io/brawlTasks2.0/" onclick="quitterPresnceCombat()" class="btn brawl-btn btn-pink px-4 py-2">⬅ RETOUR</a>
+        </div>
+
+        <!-- ÉCRAN CONNEXION -->
+        <div id="loginPage" class="login-container p-5 text-center">
+            <h1 class="brawl-font text-info mb-4" style="font-size: 3rem;">ARENE PvP</h1>
+            <div class="mb-4 text-start">
+                <label class="form-label fw-bold">Choisis ton nom :</label>
+                <select id="usernameSelect" class="form-select bg-dark text-white"><option value="">Chargement...</option></select>
+            </div>
+            <button onclick="handleLogin()" class="btn brawl-btn btn-yellow w-100 py-3">SE CONNECTER</button>
+        </div>
+
+        <!-- LOBBY -->
+        <div id="lobbyPhase" class="brawl-card p-4 mb-4 text-center d-none">
+            <h3 class="brawl-font text-info mb-3">JOUEURS DISPONIBLES EN LIGNE</h3>
+            <div class="mb-3 mx-auto" style="max-width: 400px;">
+                <select id="opponentSelect" class="form-select bg-dark text-white mb-3"><option value="">Aucun joueur...</option></select>
+                <button onclick="envoyerInvitation()" class="btn brawl-btn btn-orange w-100 py-3">INVITER AU COMBAT ⚔️</button>
+            </div>
+            <div id="lobbyStatus" class="text-warning fw-bold mt-2">Prêt...</div>
+        </div>
+
+        <!-- SÉLECTION CARTES -->
+        <div id="setupPhase" class="brawl-card p-4 mb-4 d-none">
+            <h3 class="brawl-font text-center text-warning mb-3" id="setupTitle">CHOISIS TES 3 POKÉMONS</h3>
+            <div id="selectionGrid" class="row row-cols-2 row-cols-sm-3 row-cols-md-4 g-3 mb-4 justify-content-center"></div>
+            <div class="text-center"><button id="startMatchBtn" onclick="validerMonDeck()" class="btn brawl-btn btn-green px-5 py-3 fs-4" disabled>VALIDER MON ÉQUIPE (0/3)</button></div>
+        </div>
+    </div>
+
+    <!-- ARÈNE DE COMBAT EMPILÉE (100VH RECOUVRE TOUT) -->
+    <div id="battlePhase" class="d-none">
+        
+        <!-- BANDEAU ANIMÉ FLOATING NOTIFICATION TOUR -->
+        <div id="brawlTurnBanner" class="brawl-banner-container">
+            <div id="brawlBannerText" class="brawl-banner-text">À TON TOUR ! 🔥</div>
+        </div>
+
+        <!-- 1. CÔTÉ ADVERSAIRE (HAUT) -->
+        <div class="zone-adversaire" id="enemyFighterCardNode">
+            <h5 class="brawl-font text-danger mb-1" id="battleEnemyName">ADVERSAIRE</h5>
+            <div class="hp-bar-container"><div id="enemyHpBar" class="hp-bar-fill"></div><div id="enemyHpText" class="hp-text">25 / 25 PV</div></div>
+            <!-- Changement : Ajout inline du style de l'adversaire avec le nouveau ratio de carte standard -->
+            <div class="pokemon-card-wrapper" id="enemyCardAnchor" style="border-color: var(--neon-pink); box-shadow: 0 0 12px var(--neon-pink); aspect-ratio: 5 / 7;"><img id="enemyFighterImg" src="" class="pokemon-card-img"></div>
+            <div id="enemyMiniDeck" class="d-flex justify-content-center mt-1"></div>
+        </div>
+        
+        <!-- LOG DES ÉVÉNEMENTS INTERMÉDIAIRE -->
+        <div class="log-box text-warning" id="combatLog">Préparez-vous...</div>
+        
+        <!-- 2. CÔTÉ MOI (MILIEU) -->
+        <div class="zone-moi" id="myFighterCardNode">
+            <div class="hp-bar-container"><div id="playerHpBar" class="hp-bar-fill"></div><div id="playerHpText" class="hp-text">25 / 25 PV</div></div>
+            <div class="pokemon-card-wrapper" id="myCardAnchor"><img id="playerFighterImg" src="" class="pokemon-card-img"></div>
+            <div id="playerMiniDeck" class="d-flex justify-content-center mt-1"></div>
+            <h5 class="brawl-font text-success mt-1 mb-0" id="battlePlayerName">MOI</h5>
+        </div>
+        
+        <!-- 3. CONTROLES ACTIONS (BAS ANCRÉ) -->
+        <div id="actionControls" class="zone-actions-bas">
+            <button id="btnAttaque" onclick="preparerAttaqueAleatoire()" class="btn brawl-btn btn-orange">ATTAQUE ⚔️</button>
+            <button id="btnEsquive" onclick="jouerCoup('esquive', 0, 'vent')" class="btn brawl-btn btn-blue">ESQUIVE 🛡️</button>
+        </div>
+    </div>
+
+    <!-- MODAL DÉFI REÇU -->
+    <div class="modal fade" id="challengeModal" data-bs-backdrop="static" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark border-warning p-4 text-center text-white" style="border: 4px solid var(--brawl-yellow); border-radius:20px;">
+                <h2 class="brawl-font text-danger mb-3">🚨 REÇU UN DÉFI !</h2>
+                <p class="fs-5 mb-4" id="challengeModalText">Un joueur veut se battre.</p>
+                <div class="d-flex gap-3 justify-content-center">
+                    <button onclick="repondreInvitation('accepte')" class="btn brawl-btn btn-green px-4 py-2">ACCEPTER</button>
+                    <button onclick="repondreInvitation('termine')" class="btn brawl-btn btn-pink px-4 py-2">REFUSER</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL FIN DE MATCH (RÉCOMPENSES) -->
+    <div class="modal fade" id="rewardModal" data-bs-backdrop="static" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark border-success p-4 text-center text-white" style="border: 6px solid var(--brawl-green); border-radius:25px;">
+                <h1 class="brawl-font text-warning mb-2" style="font-size: 3rem;" id="rewardTitle">FIN DU COMBAT</h1>
+                <p class="fs-4 text-white fw-bold mb-2" id="rewardXpText">+0 XP Gagné</p>
+                
+                <!-- Bloc Level Up -->
+                <div id="levelUpSection" class="d-none my-3 p-3 bg-black border border-warning rounded">
+                    <h3 class="brawl-font text-danger">🎉 LEVEL UP ! NIVEAU SUPÉRIEUR !</h3>
+                    <p class="text-info font-monospace">Tu débloques une nouvelle carte Pokémon en cadeau :</p>
+                    <div style="max-width: 140px; display:inline-block;"><img id="rewardCardImg" src="" class="img-fluid rounded border border-white"></div>
+                </div>
+
+                <button onclick="recommencerNouvellePartie()" class="btn brawl-btn btn-yellow py-3 px-5 mt-3 w-100">LANCER UNE NOUVELLE PARTIE</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbxQIa8HMSBDhGczlwVmINFSyZp_hSuEcXEzB5r7_5KdwEcQVn00VKGLO_0rQVN8hjYx/exec";
+        let currentUser = null, selectedTeamIds = [], myCollection = [];
+        let activeCombatId = null, roleJ1oJ2 = null, currentLocalState = -1, challengeModalInst = null, rewardModalInst = null;
+        let lastKnownLog = "", intervalMoteurId = null;
+        let oldMonIndex = 0, oldSonIndex = 0, dernierTourAnime = "";
+
+        window.addEventListener('DOMContentLoaded', () => {
+            challengeModalInst = new bootstrap.Modal(document.getElementById('challengeModal'));
+            rewardModalInst = new bootstrap.Modal(document.getElementById('rewardModal'));
+            
+            const s1 = document.getElementById('usernameSelect');
+            s1.innerHTML = '<option value="">Connexion au serveur...</option>';
+
+            fetch(`${API_URL}?action=getMembres`)
+                .then(res => { if (!res.ok) throw new Error("Erreur réseau"); return res.json(); })
+                .then(membres => {
+                    s1.innerHTML = '<option value="">-- Qui es-tu ? --</option>';
+                    membres.forEach(m => {
+                        if (m) {
+                            let nomJoueur = (typeof m === 'object') ? (m.Nom || m.user) : m;
+                            if (nomJoueur && nomJoueur !== 'Admin') {
+                                s1.innerHTML += `<option value="${nomJoueur}">${nomJoueur}</option>`;
+                            }
+                        }
+                    });
+                })
+                .catch(err => { s1.innerHTML = '<option value="">❌ Erreur de connexion</option>'; });
+        });
+
+        function handleLogin() {
+            currentUser = document.getElementById('usernameSelect').value; if(!currentUser) return;
+            document.getElementById('loginPage').classList.add('d-none'); 
+            document.getElementById('headerBar').classList.remove('d-none');
+            document.getElementById('lobbyPhase').classList.remove('d-none');
+            document.getElementById('displayUsername').innerText = currentUser.toUpperCase();
+
+            fetch(`${API_URL}?action=setPresenceCombat&username=${encodeURIComponent(currentUser)}&status=OUI`).then(() => {
+                intervalMoteurId = setInterval(moteurStateCombat, 3000);
+                moteurStateCombat();
+            });
+            fetch(`${API_URL}?action=getCollection`).then(res => res.json()).then(cards => {
+                myCollection = cards.filter(c => (c.Nom_Joueur || "").toLowerCase() === currentUser.toLowerCase());
+            });
+        }
+
+        function quitterPresnceCombat() { 
+            if(intervalMoteurId) clearInterval(intervalMoteurId);
+            if(currentUser) fetch(`${API_URL}?action=setPresenceCombat&username=${encodeURIComponent(currentUser)}&status=NON`, {keepalive: true}); 
+        }
+
+        function moteurStateCombat() {
+            fetch(`${API_URL}?action=getState&username=${encodeURIComponent(currentUser)}`).then(res => res.json()).then(state => {
+                if (state && state.stateUpdate !== currentLocalState) {
+                    currentLocalState = state.stateUpdate;
+                    fetch(`${API_URL}?action=getMembresActifs&username=${encodeURIComponent(currentUser)}`).then(res => res.json()).then(actifs => {
+                        const s2 = document.getElementById('opponentSelect'); s2.innerHTML = actifs.length ? '' : '<option value="">Aucun joueur...</option>';
+                        actifs.forEach(a => s2.innerHTML += `<option value="${a}">${a}</option>`);
+                    });
+                    verifierMatchs();
+                }
+            });
+        }
+
+        function verifierMatchs() {
+            fetch(`${API_URL}?action=rechercherDefis&username=${encodeURIComponent(currentUser)}`).then(res => res.json()).then(data => {
+                if (!data.found) return;
+                let c = data.combat; activeCombatId = c.ID_Combat;
+
+                if (c.Statut === 'afficher_modal' || c.Statut === 'termine') {
+                    if (intervalMoteurId) { clearInterval(intervalMoteurId); intervalMoteurId = null; }
+                    document.getElementById('nonBattleInterface').classList.add('d-none');
+                    document.getElementById('battlePhase').classList.remove('d-none');
+                    synchroniserVisuels(c);
+                    return;
+                }
+
+                if (c.Statut === 'en_attente') {
+                    if (c.Joueur_2.toLowerCase() === currentUser.toLowerCase()) {
+                        roleJ1oJ2 = "J2"; document.getElementById('challengeModalText').innerText = `${c.Joueur_1} te défie en duel !`; challengeModalInst.show();
+                    } else {
+                        roleJ1oJ2 = "J1"; document.getElementById('lobbyStatus').innerText = "⏳ Invitation envoyée... En attente qu'il accepte.";
+                    }
+                }
+                else if (c.Statut === 'configuration') {
+                    challengeModalInst.hide();
+                    document.getElementById('lobbyPhase').classList.add('d-none'); 
+                    document.getElementById('setupPhase').classList.remove('d-none');
+                    let monDeckDejavalide = (roleJ1oJ2 === 'J1' ? c.Deck_J1 : c.Deck_J2);
+                    if (monDeckDejavalide && monDeckDejavalide !== "") {
+                        document.getElementById('setupTitle').innerText = "⏳ Équipe validée ! En attente de l'adversaire...";
+                        document.getElementById('selectionGrid').innerHTML = '<div class="text-center w-100 py-5 text-warning fw-bold fs-5">Tu as choisi tes 3 cartes.<br>Le combat se lance dès que l\'adversaire a fini !</div>';
+                        document.getElementById('startMatchBtn').classList.add('d-none');
+                    } else {
+                        document.getElementById('setupTitle').innerText = "CHOISIS TES 3 POKÉMONS DE COMBAT";
+                        document.getElementById('startMatchBtn').classList.remove('d-none');
+                        if (!document.getElementById('selectionGrid').querySelector('.pokemon-card-wrapper')) renderGrid();
+                    }
+                }
+                else if (c.Statut === 'actif') {
+                    document.getElementById('nonBattleInterface').classList.add('d-none');
+                    document.getElementById('battlePhase').classList.remove('d-none');
+                    let oppName = (roleJ1oJ2 === 'J1') ? c.Joueur_2 : c.Joueur_1; document.getElementById('battleEnemyName').innerText = oppName.toUpperCase();
+                    synchroniserVisuels(c);
+                }
+            });
+        }
+
+        function envoyerInvitation() {
+            let opp = document.getElementById('opponentSelect').value; if(!opp) return alert("Choisis un adversaire !");
+            fetch(`${API_URL}?action=creerMatch&j1=${encodeURIComponent(currentUser)}&j2=${encodeURIComponent(opp)}`);
+        }
+
+        function repondreInvitation(choix) {
+            challengeModalInst.hide();
+            fetch(`${API_URL}?action=repondreDefi&id=${activeCombatId}&statut=${choix}`).then(() => {
+                if (choix === 'accepte') {
+                    document.getElementById('lobbyPhase').classList.add('d-none'); document.getElementById('setupPhase').classList.remove('d-none'); renderGrid();
+                }
+            });
+        }
+
+        function renderGrid() {
+            const container = document.getElementById('selectionGrid'); container.innerHTML = "";
+            myCollection.forEach((c, idx) => {
+                let img = c.Image_URL || c.Image; let id = c.Pokemon_API_ID || idx; let isSel = selectedTeamIds.includes(id) ? 'selected' : '';
+                container.innerHTML += `<div class="col"><div class="pokemon-card-wrapper ${isSel}" onclick="toggleCard('${id}')"><img src="${img}" class="pokemon-card-img"></div></div>`;
+            });
+        }
+
+        function toggleCard(id) {
+            if(selectedTeamIds.includes(id)) selectedTeamIds = selectedTeamIds.filter(i => i !== id); else if (selectedTeamIds.length < 3) selectedTeamIds.push(id);
+            renderGrid();
+            document.getElementById('startMatchBtn').innerText = `VALIDER MON ÉQUIPE (${selectedTeamIds.length} / 3)`;
+            document.getElementById('startMatchBtn').disabled = selectedTeamIds.length !== 3;
+        }
+
+        function validerMonDeck() {
+            let deckString = selectedTeamIds.join(','); document.getElementById('startMatchBtn').disabled = true;
+            fetch(`${API_URL}?action=repondreDefi&id=${activeCombatId}&statut=pret&deck=${encodeURIComponent(deckString)}&role=${roleJ1oJ2}`).then(() => { verifierMatchs(); });
+        }
+
+        function animerBandeauTour(tourActuel) {
+            if (tourActuel === dernierTourAnime) return;
+            dernierTourAnime = tourActuel;
+
+            const bannerContainer = document.getElementById('brawlTurnBanner');
+            const bannerText = document.getElementById('brawlBannerText');
+
+            bannerContainer.style.display = 'none';
+            void bannerContainer.offsetWidth; 
+            bannerContainer.style.display = 'block';
+
+            if (tourActuel.toLowerCase() === currentUser.toLowerCase()) {
+                bannerText.innerText = "À TON TOUR ! 🔥";
+                bannerText.className = "brawl-banner-text banner-moi";
+            } else {
+                bannerText.innerText = `TOUR DE ${tourActuel.toUpperCase()} ⏳`;
+                bannerText.className = "brawl-banner-text banner-adversaire";
+            }
+
+            setTimeout(() => {
+                bannerContainer.style.display = 'none';
+            }, 1600);
+        }
+
+        function synchroniserVisuels(c) {
+            if ((c.Statut === 'termine' || c.Statut === 'afficher_modal' || c.Statut === 'accepte_defis') && intervalMoteurId) {
+                clearInterval(intervalMoteurId);
+                intervalMoteurId = null;
+            }
+
+            let monTour = (c.Tour_A.toLowerCase() === currentUser.toLowerCase());
+            
+            if (c.Statut === 'actif') {
+                animerBandeauTour(c.Tour_A);
+            }
+
+            let mesPV = (roleJ1oJ2 === 'J1') ? c.HP_J1 : c.HP_J2; let sesPV = (roleJ1oJ2 === 'J1') ? c.HP_J2 : c.HP_J1;
+            let monIndex = (roleJ1oJ2 === 'J1') ? parseInt(c.Index_J1) : parseInt(c.Index_J2); let sonIndex = (roleJ1oJ2 === 'J1') ? parseInt(c.Index_J2) : parseInt(c.Index_J1);
+            let monDeck = (roleJ1oJ2 === 'J1' ? c.Deck_J1 : c.Deck_J2).split(','); let sonDeck = (roleJ1oJ2 === 'J1' ? c.Deck_J2 : c.Deck_J1).split(',');
+
+            let monIndexVisuel = monIndex >= 3 ? 2 : monIndex;
+            let sonIndexVisuel = sonIndex >= 3 ? 2 : sonIndex;
+
+            if(monDeck[monIndexVisuel]) document.getElementById('playerFighterImg').src = `https://images.pokemontcg.io/swsh8/${monDeck[monIndexVisuel].replace('swsh8-', '')}_hires.png`;
+            if(sonDeck[sonIndexVisuel]) document.getElementById('enemyFighterImg').src = `https://images.pokemontcg.io/swsh8/${sonDeck[sonIndexVisuel].replace('swsh8-', '')}_hires.png`;
+
+            if (monIndex !== oldMonIndex) {
+                executerAnimationShatter(true, monDeck[oldMonIndex], monDeck[monIndex >= 3 ? 2 : monIndex]);
+                oldMonIndex = monIndex;
+            }
+            if (sonIndex !== oldSonIndex) {
+                executerAnimationShatter(false, sonDeck[oldSonIndex], sonDeck[sonIndex >= 3 ? 2 : sonIndex]);
+                oldSonIndex = sonIndex;
+            }
+
+            let mesPVAAfficher = (monIndex >= 3) ? 0 : mesPV;
+            let sesPVAAfficher = (sonIndex >= 3) ? 0 : sesPV;
+
+            document.getElementById('playerHpBar').style.width = (mesPVAAfficher / 25 * 100) + "%"; document.getElementById('playerHpText').innerText = `${mesPVAAfficher} / 25 PV`;
+            document.getElementById('enemyHpBar').style.width = (sesPVAAfficher / 25 * 100) + "%"; document.getElementById('enemyHpText').innerText = `${sesPVAAfficher} / 25 PV`;
+
+            if (c.Statut === 'termine' || c.Statut === 'afficher_modal') {
+                document.getElementById('btnAttaque').disabled = true;
+                document.getElementById('btnEsquive').disabled = true;
+            } else {
+                document.getElementById('btnAttaque').disabled = !monTour;
+                document.getElementById('btnEsquive').disabled = !monTour;
+            }
+
+            const pMini = document.getElementById('playerMiniDeck'); pMini.innerHTML = "";
+            monDeck.forEach((idCard, i) => {
+                let statusClass = (i === monIndex) ? 'active-mini' : (i < monIndex ? 'ko-mini' : '');
+                pMini.innerHTML += `<img src="https://images.pokemontcg.io/swsh8/${idCard.replace('swsh8-', '')}_hires.png" class="mini-card ${statusClass}">`;
+            });
+
+            const eMini = document.getElementById('enemyMiniDeck'); eMini.innerHTML = "";
+            sonDeck.forEach((idCard, i) => {
+                let statusClass = (i === sonIndex) ? 'active-mini' : (i < sonIndex ? 'ko-mini' : '');
+                eMini.innerHTML += `<img src="https://images.pokemontcg.io/swsh8/${idCard.replace('swsh8-', '')}_hires.png" class="mini-card ${statusClass}">`;
+            });
+
+            if (c.Dernier_Coup && c.Dernier_Coup !== lastKnownLog) {
+                lastKnownLog = c.Dernier_Coup;
+                document.getElementById('combatLog').innerText = c.Dernier_Coup.split('|')[0];
+                
+                let elementTrouve = 'feu';
+                if (c.Dernier_Coup.includes("[eau]")) elementTrouve = 'eau';
+                if (c.Dernier_Coup.includes("[eclair]")) elementTrouve = 'eclair';
+                if (c.Dernier_Coup.includes("[feuille]")) elementTrouve = 'feuille';
+
+                if (c.Dernier_Coup.includes("lance une attaque")) {
+                    lancerAnimationFX(c.Dernier_Coup.startsWith(currentUser), elementTrouve, false, c.Dernier_Coup);
+                } else if (c.Dernier_Coup.includes("RETOURNE l'attaque")) {
+                    lancerAnimationFX(!c.Dernier_Coup.startsWith(currentUser), elementTrouve, true, c.Dernier_Coup); 
+                } else if (c.Dernier_Coup.startsWith("FIN_MATCH:")) {
+                    gererOuvertureModalFin(c.Dernier_Coup);
+                }
+            }
+        }
+
+        function executerAnimationShatter(estMoi, idAncienneCarte, idNouvelleCarte) {
+            const anchor = estMoi ? document.getElementById('myCardAnchor') : document.getElementById('enemyCardAnchor');
+            const imgEl = estMoi ? document.getElementById('playerFighterImg') : document.getElementById('enemyFighterImg');
+            anchor.classList.add('shatter-card', 'glass-crack');
+            setTimeout(() => {
+                anchor.classList.remove('shatter-card', 'glass-crack');
+                if (idNouvelleCarte) {
+                    imgEl.src = `https://images.pokemontcg.io/swsh8/${idNouvelleCarte.replace('swsh8-', '')}_hires.png`;
+                    anchor.style.transform = "scale(0.2)";
+                    setTimeout(() => { anchor.style.transform = "scale(1)"; }, 50);
+                }
+            }, 800);
+        }
+
+        function preparerAttaqueAleatoire() {
+            const elements = ['feu', 'eau', 'eclair', 'feuille'];
+            const elementChoisi = elements[Math.floor(Math.random() * elements.length)];
+            let dmg = Math.floor(Math.random() * 12) + 10;
+            jouerCoup('attaque', dmg, elementChoisi);
+        }
+
+        function jouerCoup(type, dmg, element) {
+            document.getElementById('btnAttaque').disabled = true;
+            document.getElementById('btnEsquive').disabled = true;
+            fetch(`${API_URL}?action=jouerActionMulti&id=${activeCombatId}&username=${encodeURIComponent(currentUser)}&type=${type}&dmg=${dmg}&element=${element}`);
+        }
+
+        function recommencerNouvellePartie() {
+            rewardModalInst.hide();
+            fetch(`${API_URL}?action=nettoyerMatchFin&id=${activeCombatId}`)
+                .then(() => {
+                    selectedTeamIds = []; 
+                    lastKnownLog = ""; 
+                    oldMonIndex = 0; 
+                    oldSonIndex = 0;
+                    dernierTourAnime = "";
+                    
+                    document.getElementById('selectionGrid').innerHTML = "";
+                    document.getElementById('setupTitle').innerText = "CHOISIS TES 3 POKÉMONS";
+                    
+                    document.getElementById('battlePhase').classList.add('d-none');
+                    document.getElementById('setupPhase').classList.add('d-none');
+                    document.getElementById('nonBattleInterface').classList.remove('d-none');
+                    document.getElementById('lobbyPhase').classList.remove('d-none');
+                    document.getElementById('lobbyStatus').innerText = "Revanche prête ! En attente de l'adversaire...";
+                    
+                    fetch(`${API_URL}?action=setPresenceCombat&username=${encodeURIComponent(currentUser)}&status=OUI`).then(() => {
+                        currentLocalState = -1;
+                        if(!intervalMoteurId) intervalMoteurId = setInterval(moteurStateCombat, 3000);
+                        moteurStateCombat();
+                    });
+                })
+                .catch(err => console.error("Erreur réinitialisation match:", err));
+        }
+
+        function lancerAnimationFX(depuisMoi, element, estUnContre, logTexte) {
+            const origine = depuisMoi ? document.getElementById('myCardAnchor') : document.getElementById('enemyCardAnchor');
+            const cible = depuisMoi ? document.getElementById('enemyCardAnchor') : document.getElementById('myCardAnchor');
+            const cibleCardNode = depuisMoi ? document.getElementById('enemyFighterCardNode') : document.getElementById('myFighterCardNode');
+            if (!origine || !cible) return;
+            const rOrigine = origine.getBoundingClientRect(); const rCible = cible.getBoundingClientRect();
+            let emoji = '🔥', colorFX = 'var(--feu-color)';
+            if (element === 'eau') { emoji = '💧'; colorFX = 'var(--eau-color)'; }
+            else if (element === 'eclair') { emoji = '⚡'; colorFX = 'var(--eclair-color)'; }
+            else if (element === 'feuille') { emoji = '🍃'; colorFX = 'var(--feuille-color)'; }
+            
+            const fx = document.createElement('div'); fx.className = 'fx-projectile'; fx.innerText = emoji;
+            fx.style.left = `${rOrigine.left + (rOrigine.width / 2) - 25}px`; fx.style.top = `${rOrigine.top + (rOrigine.height / 2) - 25}px`;
+            document.body.appendChild(fx);
+            
+            setTimeout(() => { fx.style.left = `${rCible.left + (rCible.width / 2) - 25}px`; fx.style.top = `${rCible.top + (rCible.height / 2) - 25}px`; fx.style.transform = "scale(1.7) rotate(360deg)"; }, 50);
+            
+            setTimeout(() => { 
+                fx.remove(); 
+                genererExplosionParticules(rCible.left + (rCible.width / 2), rCible.top + (rCible.height / 2), colorFX); 
+                cibleCardNode.classList.add('shake-card'); 
+                setTimeout(() => { cibleCardNode.classList.remove('shake-card'); }, 400); 
+
+                if (logTexte && logTexte.includes("FIN_MATCH:")) {
+                    gererOuvertureModalFin(logTexte);
+                }
+            }, 750);
+        }
+
+        function gererOuvertureModalFin(logChaine) {
+            let chaineBrute = logChaine.substring(logChaine.indexOf("FIN_MATCH:"));
+            let portions = chaineBrute.replace("FIN_MATCH:", "").split("|");
+            let vainqueur = portions[0];
+            let detailLevelUp = portions[1] || "RAS";
+            let jeSuisVainqueur = (vainqueur.toLowerCase() === currentUser.toLowerCase());
+
+            setTimeout(() => {
+                document.getElementById('rewardTitle').innerText = jeSuisVainqueur ? "🏆 VICTOIRE !" : "💀 DÉFAITE !";
+                document.getElementById('rewardXpText').innerText = jeSuisVainqueur ? "+20 XP Accumulés !" : "+0 XP (Essaie encore !)";
+                
+                if (jeSuisVainqueur && detailLevelUp.startsWith("LEVEL_UP:")) {
+                    let idCarteOfferte = detailLevelUp.replace("LEVEL_UP:", "");
+                    document.getElementById('rewardCardImg').src = `https://images.pokemontcg.io/swsh8/${idCarteOfferte.replace('swsh8-', '')}_hires.png`;
+                    document.getElementById('levelUpSection').classList.remove('d-none');
+                } else {
+                    document.getElementById('levelUpSection').classList.add('d-none');
+                }
+                rewardModalInst.show();
+            }, 450);
+        }
+
+        function genererExplosionParticules(centerX, centerY, couleur) {
+            const nbParticules = 22;
+            for (let i = 0; i < nbParticules; i++) {
+                const particule = document.createElement('div'); particule.className = 'fx-particle'; particule.style.backgroundColor = couleur;
+                particule.style.left = `${centerX}px`; particule.style.top = `${centerY}px`;
+                const size = Math.floor(Math.random() * 8) + 4; particule.style.width = `${size}px`; particule.style.height = `${size}px`;
+                document.body.appendChild(particule);
+                const angle = Math.random() * Math.PI * 2; const distance = Math.floor(Math.random() * 80) + 40;
+                const targetX = centerX + Math.cos(angle) * distance; const targetY = centerY + Math.sin(angle) * distance;
+                particule.animate([ { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 }, { left: `${targetX}px`, top: `${targetY}px`, transform: 'translate(-50%, -50%) scale(0)', opacity: 0 } ], { duration: 600 + Math.random() * 300, easing: 'cubic-bezier(0.1, 0.8, 0.3, 1)', fill: 'forwards' });
+                setTimeout(() => particule.remove(), 900);
+            }
+        }
+    </script>
+</body>
+</html>

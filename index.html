@@ -361,8 +361,8 @@
     </div>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbzKgKRkfVyQuNCrc0T13iH1orPFeWIZAK4kB_emnRFimN-ae_HzISIqUzZ_g1aWgPwHjg/exec";
-        let currentUser = null, selectedTeamIds = [], myCollection = [];
+const API_URL = "https://script.google.com/macros/s/AKfycbxQIa8HMSBDhGczlwVmINFSyZp_hSuEcXEzB5r7_5KdwEcQVn00VKGLO_0rQVN8hjYx/exec";
+        let currentUser = null, selectedTeamIds = [], myCollection = [], allCollectionCardsGlobal = []; // Ajout de allCollectionCardsGlobal ici
         let activeCombatId = null, roleJ1oJ2 = null, currentLocalState = -1, challengeModalInst = null, rewardModalInst = null;
         let lastKnownLog = "", intervalMoteurId = null;
         let oldMonIndex = 0, oldSonIndex = 0, dernierTourAnime = "";
@@ -390,7 +390,7 @@
                 .catch(err => { s1.innerHTML = '<option value="">❌ Erreur de connexion</option>'; });
         });
 
-        function handleLogin() {
+function handleLogin() {
             currentUser = document.getElementById('usernameSelect').value; if(!currentUser) return;
             document.getElementById('loginPage').classList.add('d-none'); 
             document.getElementById('headerBar').classList.remove('d-none');
@@ -402,8 +402,28 @@
                 moteurStateCombat();
             });
             fetch(`${API_URL}?action=getCollection`).then(res => res.json()).then(cards => {
+                allCollectionCardsGlobal = cards || []; // Sauvegarde l'ensemble des cartes (Moi + Adversaire)
                 myCollection = cards.filter(c => (c.Nom_Joueur || "").toLowerCase() === currentUser.toLowerCase());
             });
+        }
+
+// Fonction d'aide pour obtenir la vraie image de la carte (Moi ou l'adversaire)
+        function getCardImgUrl(cardId) {
+            let found = allCollectionCardsGlobal.find(c => {
+                let currentId = c.Pokemon_API_ID || c.ID || c.id || "";
+                return currentId.toString() === cardId.toString();
+            });
+            
+            if (found) {
+                return found.Image_URL || found.Image || "";
+            }
+            
+            // Fallback Pokémon si l'ID commence par swsh8
+            if (typeof cardId === 'string' && cardId.startsWith('swsh8-')) {
+                return `https://images.pokemontcg.io/swsh8/${cardId.replace('swsh8-', '')}_hires.png`;
+            }
+            
+            return "https://placehold.co/280x390/151824/8b5cf6?text=Image+Non+Disponible";
         }
 
         function quitterPresnceCombat() { 
@@ -526,7 +546,7 @@
             }, 1600);
         }
 
-        function synchroniserVisuels(c) {
+function synchroniserVisuels(c) {
             if ((c.Statut === 'termine' || c.Statut === 'afficher_modal' || c.Statut === 'accepte_defis') && intervalMoteurId) {
                 clearInterval(intervalMoteurId);
                 intervalMoteurId = null;
@@ -545,8 +565,9 @@
             let monIndexVisuel = monIndex >= 3 ? 2 : monIndex;
             let sonIndexVisuel = sonIndex >= 3 ? 2 : sonIndex;
 
-            if(monDeck[monIndexVisuel]) document.getElementById('playerFighterImg').src = `https://images.pokemontcg.io/swsh8/${monDeck[monIndexVisuel].replace('swsh8-', '')}_hires.png`;
-            if(sonDeck[sonIndexVisuel]) document.getElementById('enemyFighterImg').src = `https://images.pokemontcg.io/swsh8/${sonDeck[sonIndexVisuel].replace('swsh8-', '')}_hires.png`;
+            // CORRECTIF : Images de combat dynamiques pour Lorcana et Pokémon
+            if(monDeck[monIndexVisuel]) document.getElementById('playerFighterImg').src = getCardImgUrl(monDeck[monIndexVisuel]);
+            if(sonDeck[sonIndexVisuel]) document.getElementById('enemyFighterImg').src = getCardImgUrl(sonDeck[sonIndexVisuel]);
 
             if (monIndex !== oldMonIndex) {
                 executerAnimationShatter(true, monDeck[oldMonIndex], monDeck[monIndex >= 3 ? 2 : monIndex]);
@@ -574,13 +595,15 @@
             const pMini = document.getElementById('playerMiniDeck'); pMini.innerHTML = "";
             monDeck.forEach((idCard, i) => {
                 let statusClass = (i === monIndex) ? 'active-mini' : (i < monIndex ? 'ko-mini' : '');
-                pMini.innerHTML += `<img src="https://images.pokemontcg.io/swsh8/${idCard.replace('swsh8-', '')}_hires.png" class="mini-card ${statusClass}">`;
+                // CORRECTIF : Miniature dynamique du joueur
+                pMini.innerHTML += `<img src="${getCardImgUrl(idCard)}" class="mini-card ${statusClass}">`;
             });
 
             const eMini = document.getElementById('enemyMiniDeck'); eMini.innerHTML = "";
             sonDeck.forEach((idCard, i) => {
                 let statusClass = (i === sonIndex) ? 'active-mini' : (i < sonIndex ? 'ko-mini' : '');
-                eMini.innerHTML += `<img src="https://images.pokemontcg.io/swsh8/${idCard.replace('swsh8-', '')}_hires.png" class="mini-card ${statusClass}">`;
+                // CORRECTIF : Miniature dynamique de l'adversaire
+                eMini.innerHTML += `<img src="${getCardImgUrl(idCard)}" class="mini-card ${statusClass}">`;
             });
 
             if (c.Dernier_Coup && c.Dernier_Coup !== lastKnownLog) {
@@ -602,14 +625,15 @@
             }
         }
 
-        function executerAnimationShatter(estMoi, idAncienneCarte, idNouvelleCarte) {
+function executerAnimationShatter(estMoi, idAncienneCarte, idNouvelleCarte) {
             const anchor = estMoi ? document.getElementById('myCardAnchor') : document.getElementById('enemyCardAnchor');
             const imgEl = estMoi ? document.getElementById('playerFighterImg') : document.getElementById('enemyFighterImg');
             anchor.classList.add('shatter-card', 'glass-crack');
             setTimeout(() => {
                 anchor.classList.remove('shatter-card', 'glass-crack');
                 if (idNouvelleCarte) {
-                    imgEl.src = `https://images.pokemontcg.io/swsh8/${idNouvelleCarte.replace('swsh8-', '')}_hires.png`;
+                    // CORRECTIF : Image de remplacement dynamique
+                    imgEl.src = getCardImgUrl(idNouvelleCarte);
                     anchor.style.transform = "scale(0.2)";
                     setTimeout(() => { anchor.style.transform = "scale(1)"; }, 50);
                 }
@@ -686,7 +710,7 @@
             }, 750);
         }
 
-        function gererOuvertureModalFin(logChaine) {
+function gererOuvertureModalFin(logChaine) {
             let chaineBrute = logChaine.substring(logChaine.indexOf("FIN_MATCH:"));
             let portions = chaineBrute.replace("FIN_MATCH:", "").split("|");
             let vainqueur = portions[0];
@@ -699,7 +723,8 @@
                 
                 if (jeSuisVainqueur && detailLevelUp.startsWith("LEVEL_UP:")) {
                     let idCarteOfferte = detailLevelUp.replace("LEVEL_UP:", "");
-                    document.getElementById('rewardCardImg').src = `https://images.pokemontcg.io/swsh8/${idCarteOfferte.replace('swsh8-', '')}_hires.png`;
+                    // CORRECTIF : Récupération dynamique de la carte de récompense
+                    document.getElementById('rewardCardImg').src = getCardImgUrl(idCarteOfferte);
                     document.getElementById('levelUpSection').classList.remove('d-none');
                 } else {
                     document.getElementById('levelUpSection').classList.add('d-none');
